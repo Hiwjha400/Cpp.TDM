@@ -1,7 +1,7 @@
 // библиотека расчёта очков за изменения карты
 import { BreackGraph } from 'pixel_combats/room';
 
-// корневые ID блоков команд (замените при необходимости реальными)
+// корневые ID блоков команд
 const RED_TEAM_ROOT_BLOCK_ID = 33;
 const BLUE_TEAM_ROOT_BLOCK_ID = 28;
 

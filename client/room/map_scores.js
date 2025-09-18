@@ -30,19 +30,22 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
     const mapChange = details.MapChange;
     // прошлое состояние области (для корректной интерпретации события)
     const oldList = details.OldMapData || [];
-    // постановка блока (одиночный или линия) — считаем постановкой ТОЛЬКО если до этого были пустые блоки
-    if (mapChange.BlockId > 0) {
+	// постановка блока (одиночный или линия)
+	if (mapChange.BlockId > 0) {
 		const newRoot = BreackGraph.BlockRoot(mapChange.BlockId);
 		// проверяем только первое старое значение, чтобы не нагружать
 		const firstOld = oldList.length > 0 ? oldList[0] : null;
-		const firstWasEmpty = !firstOld || !firstOld.BlockId || firstOld.BlockId === 0;
-		if (firstWasEmpty && newRoot !== enemyRootBlockId) {
-			log.Debug(`[MapScores] PLACE ok id=${mapChange.BlockId} blocks=${mapChange.Range.BlocksCount} +${PLACE_BLOCK_SCORE}`);
-			return PLACE_BLOCK_SCORE;
+		if (firstOld && firstOld.BlockId && firstOld.BlockId > 0) {
+			const oldRoot = BreackGraph.BlockRoot(firstOld.BlockId);
+			// если рут совпадает — это промежуточная стадия поломки, очки не начисляем
+			if (oldRoot === newRoot) {
+				log.Debug(`[MapScores] PLACE skip: intermediate root=${newRoot}`);
+				return 0;
+			}
 		}
-		log.Debug(`[MapScores] PLACE skip: replaceOrEnemy firstWasEmpty=${firstWasEmpty} newRoot=${newRoot}`);
-        return 0;
-    }
+		log.Debug(`[MapScores] PLACE ok id=${mapChange.BlockId} blocks=${mapChange.Range.BlocksCount} +${PLACE_BLOCK_SCORE}`);
+		return PLACE_BLOCK_SCORE;
+	}
 
     // поломка блока определяем как изменение блока на 0 (стирание)
     const isDeletion = mapChange.BlockId === 0;

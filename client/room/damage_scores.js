@@ -14,8 +14,11 @@ const MAP_MODIFIERS = {
 };
 
 function getMapModifier() {
-	const length = GameMode.Parameters.GetString(MAP_LENGTH_PARAM);
-	return MAP_MODIFIERS[length] || 1.0;
+	// временный модификатор
+	return 1.0;
+	// todo: восстановить, когда будет правильный сервис получения размера карты
+	//const length = GameMode.Parameters.GetString(MAP_LENGTH_PARAM);
+	//return MAP_MODIFIERS[length] || 1.0;
 }
 
 const KILL_SCORES = 5; // командные очки за килл

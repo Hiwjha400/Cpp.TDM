@@ -1,9 +1,8 @@
 // библиотека расчёта очков за изменения карты
 import { BreackGraph } from 'pixel_combats/room';
-import { log } from 'pixel_combats/debug';
 
 // константы
-const SCORES_PROP_NAME = "Scores";          // имя свойства очков у игрока/команды
+const SCORES_PROP_NAME = "Scores";           // имя свойства очков у игрока/команды
 const ENEMY_BLOCK_SCORE = 25;                // очки за разрушение 1 вражеского блока
 const MAP_BLOCK_SCORE = 2;                   // очки за разрушение 1 блока карты
 const PLACE_BLOCK_SCORE = 5;                 // очки за постановку блока/линии
@@ -30,19 +29,12 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
     const mapChange = details.MapChange;
     // прошлое состояние области (для корректной интерпретации события)
     const oldList = details.OldMapData || [];
-	// постановка блока (одиночный или линия)
+	// постановка блока или замена на новый в цепочке поломки блока (одиночный или линия)
 	if (mapChange.BlockId > 0) {
 		// проверяем только первое старое значение, чтобы не нагружать
 		const firstOld = oldList.length > 0 ? oldList[0] : null;
 		const firstWasEmpty = !firstOld || !firstOld.BlockId || firstOld.BlockId === 0;
-		log.Debug(`[MapScores] oldList.length=${oldList.length}`);
-		if(oldList.length > 0) {
-			log.Debug(`[MapScores] oldList[0]=${oldList[0]}`);
-			log.Debug(`[MapScores] oldList[0]=${oldList[0].Range}`);
-			log.Debug(`[MapScores] oldList[0].BlockId=${oldList[0].BlockId}`);
-		}
-		log.Debug(`[MapScores] firstOld=${firstOld?.BlockId} firstWasEmpty=${firstWasEmpty}`);
-		// если было пустота то это постановка блока
+		// если было пустота то это постановка блока, иначе это замена блока
 		if (firstWasEmpty) return PLACE_BLOCK_SCORE;
 		else return 0; 
 	}
@@ -64,21 +56,17 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
 		if (blocksCount < 1) blocksCount = 1;
         if (root === enemyRootBlockId) {
 			// разрушение блока врага
-            total += ENEMY_BLOCK_SCORE * blocksCount;
-            log.Debug(`[MapScores] ERASE enemy id=${old.BlockId} blocks=${blocksCount} +${ENEMY_BLOCK_SCORE * blocksCount}`);
+            total += ENEMY_BLOCK_SCORE * blocksCount;            
 		}
 		else if (root === allyRootBlockId) {
 			// разрушение своего/союзного блока — без очков
             // total += 0;
-            log.Debug(`[MapScores] ERASE ally id=${old.BlockId} blocks=${blocksCount} +0`);
 		}
 		else {
 			// блок карты — фиксированное количество за каждый удалённый блок
-            total += MAP_BLOCK_SCORE * blocksCount;
-            log.Debug(`[MapScores] ERASE map id=${old.BlockId} blocks=${blocksCount} +${MAP_BLOCK_SCORE * blocksCount}`);
+            total += MAP_BLOCK_SCORE * blocksCount;            
 		}
 	}
-    log.Debug(`[MapScores] ERASE total=+${total}`);
 	return total;
 }
 
@@ -89,7 +77,6 @@ export function applyMapEditScores(player, details, blueTeam, redTeam) {
 	const roots = getAllyEnemyRootIds(player, blueTeam, redTeam);
     const add = calcMapEditScore(details, roots.allyRootId, roots.enemyRootId);
     player.Properties.Scores.Value += add;
-    log.Debug(`[MapScores] APPLY +${add}`);
 }
 
 

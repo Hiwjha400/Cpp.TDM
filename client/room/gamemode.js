@@ -15,9 +15,10 @@ const EndOfMatchTime = 8;
 const VoteTime = 10;
 
 // очки
-const WINNER_SCORES = 10;
-const TIMER_SCORES = 10;
-const SCORES_TIMER_INTERVAL = 30;
+const WINNER_SCORES = 400;  		// очки за победу
+const LOSER_SCORES = 200;			// очки за поражение
+const TIMER_SCORES = 30;			// очки за проведенное время
+const TIMER_SCORES_INTERVAL = 30;	// интервал таймера очков
 
 // имена используемых объектов
 const WaitingStateValue = "Waiting";
@@ -234,6 +235,10 @@ function SetEndOfMatch() {
 		for (const win_player of leaderboard[0].Team.Players) {
 			win_player.Properties.Scores.Value += WINNER_SCORES;
 		}
+		// добавляем очки проигравшим
+		for (const lose_player of leaderboard[1].Team.Players) {
+			lose_player.Properties.Scores.Value += LOSER_SCORES;
+		}
 	}
 	else {
 		SetEndOfMatch_EndMode();
@@ -305,5 +310,5 @@ function SpawnTeams() {
 		Spawns.GetContext(team).Spawn();
 }
 
-scores_timer.RestartLoop(SCORES_TIMER_INTERVAL);
+scores_timer.RestartLoop(TIMER_SCORES_INTERVAL);
 

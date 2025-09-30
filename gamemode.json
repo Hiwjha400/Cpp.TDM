@@ -9,10 +9,23 @@
   "MapLists": [
     {
       "MapListId": 324,
-      "Name": "Официальные карты"
+      "Name": "Официальные карты",
+      "Parameters": {
+        "GameLength": "Length_S"
+      }
     },
     {
-      "MapListId": 581
+      "MapListId": 581,
+      "Parameters": {
+        "GameLength": "Length_XL"
+      }
+    }
+  ],
+  "ParametersDeclaration": [
+    {
+      "Name": "GameLength",
+      "Type": "String",
+      "Default": "Length_M"
     }
   ],
   "Parameters": {

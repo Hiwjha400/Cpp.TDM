@@ -112,15 +112,15 @@ function calcAssistScore(assistItem) {
 export function applyKillReportScores(victim, killer, report) {
 	if (!report) return;
 	// убийца
-	if (killer && victim && killer.Team != null && victim.Team != null && killer.Team != victim.Team) {
-        // обработка команды убийцы
-        const teamScoresProp = killer.Team && killer.Team.Properties ? killer.Team.Properties.Get(SCORES_PROP_NAME) : null;
-        if (teamScoresProp)
-            teamScoresProp.Value += KILL_SCORES;
+    if (killer && victim && killer.Team != null && victim.Team != null && killer.Team != victim.Team) {
         // обработка индивидуальных очков убийцы
         ++killer.Properties.Kills.Value;
 		const killAdd = calcKillScoreFromHit(report.KillHit);
 		killer.Properties.Scores.Value += killAdd;
+		// обработка команды убийцы
+		const teamScoresProp = killer.Team && killer.Team.Properties ? killer.Team.Properties.Get(SCORES_PROP_NAME) : null;
+        if (teamScoresProp)
+            teamScoresProp.Value += killAdd;
 		// визуализация начисления очков за килл
 		ScoreInfo.Show(killer, {
 			Type: 2, // ScoreInformType.Kill
@@ -141,7 +141,10 @@ export function applyKillReportScores(victim, killer, report) {
 		// обработка индивидуальных очков ассиста
 		const assistAdd = calcAssistScore(i);
 		i.Attacker.Properties.Scores.Value += assistAdd;
-		// визуализация начисления очков за ассист
+        // синхронизируем очки команды с очками игрока за ассист
+        const teamProp = i.Attacker.Team && i.Attacker.Team.Properties ? i.Attacker.Team.Properties.Get(SCORES_PROP_NAME) : null;
+        if (teamProp) teamProp.Value += assistAdd;
+        // визуализация начисления очков за ассист
 		ScoreInfo.Show(i.Attacker, {
 			Type: 1, // ScoreInformType.Assist
 			WeaponId: 0,

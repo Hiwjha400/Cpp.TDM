@@ -102,6 +102,8 @@ export function applyMapEditScores(player, details, blueTeam, redTeam) {
 	const roots = getAllyEnemyRootIds(player, blueTeam, redTeam);
     const add = calcMapEditScore(details, roots.allyRootId, roots.enemyRootId);
     player.Properties.Scores.Value += add;
+    const teamProp = player.Team && player.Team.Properties ? player.Team.Properties.Get(SCORES_PROP_NAME) : null;
+    if (teamProp) teamProp.Value += add;
 }
 
 

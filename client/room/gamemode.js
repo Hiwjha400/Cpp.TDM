@@ -7,8 +7,7 @@ import * as mapScores from './map_scores.js';
 
 // настройки
 const WaitingPlayersTime = 10;
-const BuildBaseTime = 30;
-const KnivesModeTime = 40;
+const TacticalPreparationTime = 30;
 const GameModeTime = default_timer.game_mode_length_seconds();
 const MockModeTime = 10;
 const EndOfMatchTime = 8;
@@ -22,8 +21,7 @@ const TIMER_SCORES_INTERVAL = 30;	// интервал таймера очков
 
 // имена используемых объектов
 const WaitingStateValue = "Waiting";
-const BuildModeStateValue = "BuildMode";
-const KnivesModeStateValue = "KnivesMode";
+const TacticalPreparationStateValue = "TacticalPreparation";
 const GameStateValue = "Game";
 const MockModeStateValue = "MockMode";
 const EndOfMatchStateValue = "EndOfMatch";
@@ -63,10 +61,10 @@ LeaderBoard.PlayerLeaderBoardValues = [
 	new DisplayValueHeader("Spawns", "Statistics/Spawns", "Statistics/SpawnsShort"),
 	new DisplayValueHeader(SCORES_PROP_NAME, "Statistics/Scores", "Statistics/ScoresShort")
 ];
-LeaderBoard.TeamLeaderBoardValue = new DisplayValueHeader(SCORES_PROP_NAME, "Statistics\Scores", "Statistics\Scores");
-// задаем сортировку команд для списка лидирующих
+LeaderBoard.TeamLeaderBoardValue = new DisplayValueHeader(SCORES_PROP_NAME, "Statistics\\Scores", "Statistics\\Scores");
+// задаем сортировку команд для списка лидирующих по сумме очков игроков
 LeaderBoard.TeamWeightGetter.Set(function (team) {
-	return team.Properties.Get(SCORES_PROP_NAME).Value;
+    return team.Players.Sum(function (p) { return p.Properties.Get(SCORES_PROP_NAME).Value; });
 });
 // задаем сортировку игроков для списка лидирующих
 LeaderBoard.PlayersWeightGetter.Set(function (player) {
@@ -126,36 +124,36 @@ MapEditor.OnMapEdited.Add(function (player, details) {
     mapScores.applyMapEditScores(player, details, blueTeam, redTeam);
 });
 
-// таймер очков за проведенное время
+// таймер очков за проведенное время (только в основной фазе)
 scores_timer.OnTimer.Add(function () {
-	for (const player of Players.All) {
-		if (player.Team == null) continue; // если вне команд то не начисляем ничего по таймеру
-		player.Properties.Scores.Value += TIMER_SCORES;
-	}
+    if (stateProp.Value !== GameStateValue) return;
+    for (const player of Players.All) {
+        if (player.Team == null) continue; // если вне команд то не начисляем
+        player.Properties.Scores.Value += TIMER_SCORES;
+        const teamProp = player.Team && player.Team.Properties ? player.Team.Properties.Get(SCORES_PROP_NAME) : null;
+        if (teamProp) teamProp.Value += TIMER_SCORES;
+    }
 });
 
 // таймер переключения состояний
 mainTimer.OnTimer.Add(function () {
-	switch (stateProp.Value) {
-		case WaitingStateValue:
-			SetBuildMode();
-			break;
-		case BuildModeStateValue:
-			SetKnivesMode();
-			break;
-		case KnivesModeStateValue:
-			SetGameMode();
-			break;
-		case GameStateValue:
-			SetEndOfMatch();
-			break;
-		case MockModeStateValue:
-			SetEndOfMatch_EndMode();
-			break;
-		case EndOfMatchStateValue:
-			start_vote();
-			break;
-	}
+    switch (stateProp.Value) {
+        case WaitingStateValue:
+            SetTacticalPreparation();
+            break;
+        case TacticalPreparationStateValue:
+            SetGameMode();
+            break;
+        case GameStateValue:
+            SetEndOfMatch();
+            break;
+        case MockModeStateValue:
+            SetEndOfMatch_EndMode();
+            break;
+        case EndOfMatchStateValue:
+            start_vote();
+            break;
+    }
 });
 
 // изначально задаем состояние ожидания других игроков
@@ -168,37 +166,22 @@ function SetWaitingMode() {
 	Spawns.GetContext().enable = false;
 	mainTimer.Restart(WaitingPlayersTime);
 }
-function SetBuildMode() {
-	stateProp.Value = BuildModeStateValue;
-	Ui.GetContext().Hint.Value = "Hint/BuildBase";
-	var inventory = Inventory.GetContext();
-	inventory.Main.Value = false;
-	inventory.Secondary.Value = false;
-	inventory.Melee.Value = true;
-	inventory.Explosive.Value = false;
-	inventory.Build.Value = true;
-	// запрет нанесения урона
-	Damage.GetContext().DamageOut.Value = false;
+function SetTacticalPreparation() {
+    stateProp.Value = TacticalPreparationStateValue;
+    Ui.GetContext().Hint.Value = "Hint/TacticalPreparation";
+    var inventory = Inventory.GetContext();
+    inventory.Main.Value = false;
+    inventory.Secondary.Value = false;
+    inventory.Melee.Value = true;
+    inventory.Explosive.Value = false;
+    inventory.Build.Value = true;
+    // урон включен, быстрый респавн
+    Damage.GetContext().DamageOut.Value = true;
+    Spawns.GetContext().RespawnTime.Value = 2;
 
-	mainTimer.Restart(BuildBaseTime);
-	Spawns.GetContext().enable = true;
-	SpawnTeams();
-}
-function SetKnivesMode() {
-	stateProp.Value = KnivesModeStateValue;
-	Ui.GetContext().Hint.Value = "Hint/KnivesMode";
-	var inventory = Inventory.GetContext();
-	inventory.Main.Value = false;
-	inventory.Secondary.Value = false;
-	inventory.Melee.Value = true;
-	inventory.Explosive.Value = false;
-	inventory.Build.Value = true;
-	// разрешение нанесения урона
-	Damage.GetContext().DamageOut.Value = true;
-
-	mainTimer.Restart(KnivesModeTime);
-	Spawns.GetContext().enable = true;
-	SpawnTeams();
+    mainTimer.Restart(TacticalPreparationTime);
+    Spawns.GetContext().enable = true;
+    SpawnTeams();
 }
 function SetGameMode() {
 	// разрешаем нанесение урона

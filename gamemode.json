@@ -13,24 +13,28 @@
     },
     {
       "MapListId": 24854,
+      "Name": "S",
       "Parameters": {
         "GameLength": "Length_S"
       }
     },
     {
       "MapListId": 24855,
+      "Name": "M",
       "Parameters": {
         "GameLength": "Length_M"
       }
     },
     {
       "MapListId": 24856,
+      "Name": "L",
       "Parameters": {
         "GameLength": "Length_L"
       }
     },
     {
       "MapListId": 24857,
+      "Name": "XL",
       "Parameters": {
         "GameLength": "Length_XL"
       }

@@ -1,21 +1,20 @@
 // библиотека расчёта очков за урон/убийства/ассисты для TDM
-import { ScoreInfo, Properties } from 'pixel_combats/room';
+import { ScoreInfo, GameMode } from 'pixel_combats/room';
 
 const SCORES_PROP_NAME = "Scores";
 
-// модификаторы очков в зависимости от длины карты
-// 0 - None, 1 - Fast, 2 - Medium, 3 - Long, 4 - ExtraLong
+// модификаторы очков в зависимости от параметра GameLength
+// значения: Length_S, Length_M, Length_L, Length_XL
 const MAP_LENGTH_MODIFIERS = {
-	1: 0.8,	// Fast
-	2: 1.0,	// Medium
-	3: 1.2,	// Long
-	4: 1.4,	// ExtraLong
+	'Length_S': 0.8,
+	'Length_M': 1.0,
+	'Length_L': 1.2,
+	'Length_XL': 1.4,
 };
 
 function getMapModifier() {
-	// читаем длину текущей карты из свойств комнаты (только чтение)
-	const prop = Properties.GetContext().MapLength;
-	const length = prop ? prop.Value : 0; // 0 - None
+	// читаем длину матча из параметров режима
+	const length = GameMode.Parameters.GetString('GameLength');
 	return MAP_LENGTH_MODIFIERS[length] || 1.0;
 }
 

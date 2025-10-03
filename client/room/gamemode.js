@@ -4,6 +4,7 @@ import * as teams from './default_teams.js';
 import * as default_timer from './default_timer.js';
 import * as damageScores from './damage_scores.js';
 import * as mapScores from './map_scores.js';
+import { addTeamScores } from './team_scores.js';
 
 // настройки
 const WaitingPlayersTime = 10;
@@ -14,8 +15,8 @@ const EndOfMatchTime = 8;
 const VoteTime = 10;
 
 // очки
-const WINNER_SCORES = 400;  		// очки за победу
-const LOSER_SCORES = 200;			// очки за поражение
+const WINNER_SCORES = 30;  		// очки за победу (новое ТЗ)
+const LOSER_SCORES = 15;			// очки за поражение (новое ТЗ)
 const TIMER_SCORES = 30;			// очки за проведенное время
 const TIMER_SCORES_INTERVAL = 30;	// интервал таймера очков
 
@@ -62,9 +63,9 @@ LeaderBoard.PlayerLeaderBoardValues = [
 	new DisplayValueHeader(SCORES_PROP_NAME, "Statistics/Scores", "Statistics/ScoresShort")
 ];
 LeaderBoard.TeamLeaderBoardValue = new DisplayValueHeader(SCORES_PROP_NAME, "Statistics\\Scores", "Statistics\\Scores");
-// задаем сортировку команд для списка лидирующих по сумме очков игроков
+// задаем сортировку команд для списка лидирующих по командному свойству
 LeaderBoard.TeamWeightGetter.Set(function (team) {
-    return team.Properties.Get(SCORES_PROP_NAME).Value;
+	return team.Properties.Get(SCORES_PROP_NAME).Value;
 });
 // задаем сортировку игроков для списка лидирующих
 LeaderBoard.PlayersWeightGetter.Set(function (player) {
@@ -114,46 +115,45 @@ Damage.OnDeath.Add(function (player) {
 
 // детальный отчёт по убийству: начисляем очки за убийство и ассисты по ТЗ
 Damage.OnKillReport.Add(function (victim, killer, report) {
-    if (stateProp.Value == MockModeStateValue) return;
-    damageScores.applyKillReportScores(victim, killer, report);
+	if (stateProp.Value == MockModeStateValue) return;
+	damageScores.applyKillReportScores(victim, killer, report);
 });
 
 // начисление очков за редактирование карты
 MapEditor.OnMapEdited.Add(function (player, details) {
-    if (stateProp.Value == MockModeStateValue) return;
-    mapScores.applyMapEditScores(player, details, blueTeam, redTeam);
+	if (stateProp.Value == MockModeStateValue) return;
+	mapScores.applyMapEditScores(player, details, blueTeam, redTeam);
 });
 
 // таймер очков за проведенное время (только в основной фазе)
 scores_timer.OnTimer.Add(function () {
-    if (stateProp.Value !== GameStateValue) return;
-    for (const player of Players.All) {
-        if (player.Team == null) continue; // если вне команд то не начисляем
-        player.Properties.Scores.Value += TIMER_SCORES;
-        const teamProp = player.Team && player.Team.Properties ? player.Team.Properties.Get(SCORES_PROP_NAME) : null;
-        if (teamProp) teamProp.Value += TIMER_SCORES;
-    }
+	if (stateProp.Value !== GameStateValue) return;
+	for (const player of Players.All) {
+		if (player.Team == null) continue; // если вне команд то не начисляем
+		player.Properties.Scores.Value += TIMER_SCORES;
+		addTeamScores(player.Team, TIMER_SCORES);
+	}
 });
 
 // таймер переключения состояний
 mainTimer.OnTimer.Add(function () {
-    switch (stateProp.Value) {
-        case WaitingStateValue:
-            SetTacticalPreparation();
-            break;
-        case TacticalPreparationStateValue:
-            SetGameMode();
-            break;
-        case GameStateValue:
-            SetEndOfMatch();
-            break;
-        case MockModeStateValue:
-            SetEndOfMatch_EndMode();
-            break;
-        case EndOfMatchStateValue:
-            start_vote();
-            break;
-    }
+	switch (stateProp.Value) {
+		case WaitingStateValue:
+			SetTacticalPreparation();
+			break;
+		case TacticalPreparationStateValue:
+			SetGameMode();
+			break;
+		case GameStateValue:
+			SetEndOfMatch();
+			break;
+		case MockModeStateValue:
+			SetEndOfMatch_EndMode();
+			break;
+		case EndOfMatchStateValue:
+			start_vote();
+			break;
+	}
 });
 
 // изначально задаем состояние ожидания других игроков
@@ -167,21 +167,21 @@ function SetWaitingMode() {
 	mainTimer.Restart(WaitingPlayersTime);
 }
 function SetTacticalPreparation() {
-    stateProp.Value = TacticalPreparationStateValue;
-    Ui.GetContext().Hint.Value = "Hint/TacticalPreparation";
-    var inventory = Inventory.GetContext();
-    inventory.Main.Value = false;
-    inventory.Secondary.Value = false;
-    inventory.Melee.Value = true;
-    inventory.Explosive.Value = false;
-    inventory.Build.Value = true;
-    // урон включен, быстрый респавн
-    Damage.GetContext().DamageOut.Value = true;
-    Spawns.GetContext().RespawnTime.Value = 2;
+	stateProp.Value = TacticalPreparationStateValue;
+	Ui.GetContext().Hint.Value = "Hint/TacticalPreparation";
+	var inventory = Inventory.GetContext();
+	inventory.Main.Value = false;
+	inventory.Secondary.Value = false;
+	inventory.Melee.Value = true;
+	inventory.Explosive.Value = false;
+	inventory.Build.Value = true;
+	// урон включен, быстрый респавн
+	Damage.GetContext().DamageOut.Value = true;
+	Spawns.GetContext().RespawnTime.Value = 2;
 
-    mainTimer.Restart(TacticalPreparationTime);
-    Spawns.GetContext().enable = true;
-    SpawnTeams();
+	mainTimer.Restart(TacticalPreparationTime);
+	Spawns.GetContext().enable = true;
+	SpawnTeams();
 }
 function SetGameMode() {
 	// разрешаем нанесение урона
@@ -256,9 +256,6 @@ function SetMockMode(winners, loosers) {
 	inventory.ExplosiveInfinity.Value = true;
 	inventory.BuildInfinity.Value = true;
 
-	// френдли фаер для победивших
-	//Damage.GetContext(winners).FriendlyFire.Value = true;
-
 	// перезапуск таймера мода
 	mainTimer.Restart(MockModeTime);
 }
@@ -279,7 +276,7 @@ function OnVoteResult(v) {
 	if (v.Result === null) return;
 	NewGame.RestartGame(v.Result);
 }
-NewGameVote.OnResult.Add(OnVoteResult); // вынесено из функции, которая выполняется только на сервере, чтобы не зависало, если не отработает, также чтобы не давало баг, если вызван метод 2 раза и появилось 2 подписки
+NewGameVote.OnResult.Add(OnVoteResult);
 
 function start_vote() {
 	NewGameVote.Start({

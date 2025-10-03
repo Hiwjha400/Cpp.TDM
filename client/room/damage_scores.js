@@ -1,12 +1,11 @@
 // библиотека расчёта очков за урон/убийства/ассисты для TDM
 import { ScoreInfo, GameMode } from 'pixel_combats/room';
-
-const SCORES_PROP_NAME = "Scores";
+import { addTeamScores } from './team_scores.js';
 
 // модификаторы очков в зависимости от параметра GameLength
 // значения: Length_S, Length_M, Length_L, Length_XL
 const MAP_LENGTH_MODIFIERS = {
-	'Length_S': 0.8,
+	'Length_S': 0.9,
 	'Length_M': 1.0,
 	'Length_L': 1.2,
 	'Length_XL': 1.4,
@@ -18,19 +17,18 @@ function getMapModifier() {
 	return MAP_LENGTH_MODIFIERS[length] || 1.0;
 }
 
-const KILL_SCORES = 5; // командные очки за килл
 const ASSIST_BASE_SCORE = 60; // базовые очки за ассист (до модификатора карты)
 
 // базовые очки (для средних карт)
 const CATEGORY_SCORES = {
-	melee:   { head: 192, body: 120 },
-	pistol:  { head: 120, body: 96 },
+	melee: { head: 192, body: 120 },
+	pistol: { head: 120, body: 96 },
 	grenade: { head: 168, body: 108 },
-	smg:     { head: 132, body: 84 },
+	smg: { head: 132, body: 84 },
 	shotgun: { head: 144, body: 90 },
-	rifle:   { head: 150, body: 96 },
-	sniper:  { head: 240, body: 144 },
-	lmg:     { head: 150, body: 96 },
+	rifle: { head: 150, body: 96 },
+	sniper: { head: 240, body: 144 },
+	lmg: { head: 150, body: 96 },
 };
 
 // маппинг ID оружия -> категория
@@ -112,15 +110,13 @@ function calcAssistScore(assistItem) {
 export function applyKillReportScores(victim, killer, report) {
 	if (!report) return;
 	// убийца
-    if (killer && victim && killer.Team != null && victim.Team != null && killer.Team != victim.Team) {
-        // обработка индивидуальных очков убийцы
-        ++killer.Properties.Kills.Value;
+	if (killer && victim && killer.Team != null && victim.Team != null && killer.Team != victim.Team) {
+		// обработка индивидуальных очков убийцы
+		++killer.Properties.Kills.Value;
 		const killAdd = calcKillScoreFromHit(report.KillHit);
 		killer.Properties.Scores.Value += killAdd;
-		// обработка команды убийцы
-		const teamScoresProp = killer.Team && killer.Team.Properties ? killer.Team.Properties.Get(SCORES_PROP_NAME) : null;
-        if (teamScoresProp)
-            teamScoresProp.Value += killAdd;
+		// обработка команды убийцы: 8% от очков игрока
+		addTeamScores(killer.Team, killAdd);
 		// визуализация начисления очков за килл
 		ScoreInfo.Show(killer, {
 			Type: 2, // ScoreInformType.Kill
@@ -132,19 +128,18 @@ export function applyKillReportScores(victim, killer, report) {
 
 	// обработка ассистов
 	for (const i of (report.Items || [])) {
-        // ограничитель убийцы
+		// ограничитель убийцы
 		if (!i || i.IsKiller) continue;
-        // и атакующий и жертва должны быть в командах
+		// и атакующий и жертва должны быть в командах
 		if (i.Attacker.Team == null || victim.Team == null) continue;
-        // ограничитель френдли фаера
+		// ограничитель френдли фаера
 		if (i.Attacker.Team === victim.Team) continue;
 		// обработка индивидуальных очков ассиста
 		const assistAdd = calcAssistScore(i);
 		i.Attacker.Properties.Scores.Value += assistAdd;
-        // синхронизируем очки команды с очками игрока за ассист
-        const teamProp = i.Attacker.Team && i.Attacker.Team.Properties ? i.Attacker.Team.Properties.Get(SCORES_PROP_NAME) : null;
-        if (teamProp) teamProp.Value += assistAdd;
-        // визуализация начисления очков за ассист
+		// синхронизируем очки команды: 8% от очков игрока за ассист
+		addTeamScores(i.Attacker.Team, assistAdd);
+		// визуализация начисления очков за ассист
 		ScoreInfo.Show(i.Attacker, {
 			Type: 1, // ScoreInformType.Assist
 			WeaponId: 0,

@@ -1,5 +1,6 @@
 // библиотека расчёта очков за изменения карты
 import { BreackGraph, ScoreInfo } from 'pixel_combats/room';
+import { addTeamScores } from './team_scores.js';
 
 // константы
 const SCORES_PROP_NAME = "Scores";           // имя свойства очков у игрока/команды
@@ -25,17 +26,17 @@ function getAllyEnemyRootIds(player, blueTeam, redTeam) {
 // breackGraph: IBreackGraphService
 // allyRootBlockId / enemyRootBlockId: корневые ID блоков команд относительно игрока
 function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
-    if (!details || !details.MapChange) return 0;
-    const mapChange = details.MapChange;
-    // прошлое состояние области (для корректной интерпретации события)
-    const oldList = details.OldMapData || [];
+	if (!details || !details.MapChange) return 0;
+	const mapChange = details.MapChange;
+	// прошлое состояние области (для корректной интерпретации события)
+	const oldList = details.OldMapData || [];
 	// постановка блока или замена на новый в цепочке поломки блока (одиночный или линия)
 	if (mapChange.BlockId > 0) {
 		// проверяем только первое старое значение, чтобы не нагружать
 		const firstOld = oldList.length > 0 ? oldList[0] : null;
 		const firstWasEmpty = !firstOld || !firstOld.BlockId || firstOld.BlockId === 0;
 		// если было пустота то это постановка блока, иначе это замена блока
-		if (firstWasEmpty){ 
+		if (firstWasEmpty) {
 			// выводим уведомление
 			ScoreInfo.Show(details.Player, {
 				Type: 3, // Build
@@ -45,16 +46,16 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
 			});
 			return PLACE_BLOCK_SCORE;
 		}
-		else return 0; 
+		else return 0;
 	}
 
-    // поломка блока определяем как изменение блока на 0 (стирание)
-    const isDeletion = mapChange.BlockId === 0;
-    if (!isDeletion) return 0;
+	// поломка блока определяем как изменение блока на 0 (стирание)
+	const isDeletion = mapChange.BlockId === 0;
+	if (!isDeletion) return 0;
 
-    // удаление: анализируем, что было до изменения (старые блоки в области)
+	// удаление: анализируем, что было до изменения (старые блоки в области)
 	let total = 0;
-    for (let i = 0; i < oldList.length; ++i) {
+	for (let i = 0; i < oldList.length; ++i) {
 		const old = oldList[i];
 		if (!old) continue;
 		if (!old.BlockId || old.BlockId === 0) continue; // пропускаем пустоту
@@ -63,10 +64,10 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
 		// количество реально удалённых блоков в данной области (свойство всегда присутствует)
 		let blocksCount = range.BlocksCount;
 		if (blocksCount < 1) blocksCount = 1;
-        if (root === enemyRootBlockId) {
+		if (root === enemyRootBlockId) {
 			// разрушение блока врага
 			let scoresToadd = ENEMY_BLOCK_SCORE * blocksCount;
-            total += scoresToadd;
+			total += scoresToadd;
 			// выводим уведомление
 			ScoreInfo.Show(details.Player, {
 				Type: 5, // EnemyBlockDestroy
@@ -77,12 +78,12 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
 		}
 		else if (root === allyRootBlockId) {
 			// разрушение своего/союзного блока — без очков
-            // total += 0;
+			// total += 0;
 		}
-        else {
+		else {
 			// блок карты — фиксированное количество за каждый удалённый блок
 			let scoresToadd = MAP_BLOCK_SCORE * blocksCount;
-            total += scoresToadd;
+			total += scoresToadd;
 			// выводим уведомление
 			ScoreInfo.Show(details.Player, {
 				Type: 4, // NeutralBlockDestroy (map block)
@@ -100,10 +101,9 @@ export function applyMapEditScores(player, details, blueTeam, redTeam) {
 	if (!player) return;
 	if (!details || !details.MapChange) return;
 	const roots = getAllyEnemyRootIds(player, blueTeam, redTeam);
-    const add = calcMapEditScore(details, roots.allyRootId, roots.enemyRootId);
-    player.Properties.Scores.Value += add;
-    const teamProp = player.Team && player.Team.Properties ? player.Team.Properties.Get(SCORES_PROP_NAME) : null;
-    if (teamProp) teamProp.Value += add;
+	const add = calcMapEditScore(details, roots.allyRootId, roots.enemyRootId);
+	player.Properties.Scores.Value += add;
+	addTeamScores(player.Team, add);
 }
 
 

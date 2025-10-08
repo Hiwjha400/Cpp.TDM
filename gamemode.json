@@ -1,6 +1,6 @@
 {
   "Name": "TDM V3",
-  "Description": "Team Death Match. Битва двух команд",
+  "Description": "mode.description",
   "StartClientVersion": 703,
   "MapFilter": {
     "IsBlank": false,

@@ -10,6 +10,7 @@
   "GmParams/MapRotation": "Map rotation",
   "GmParams/OnlyKnives": "Only knives",
   "GmParams/OnlyPlayerBlocksDmg": "Damage only to player blocks",
-  "GmParams/LoosenBlocks": "Loosen blocks"
+  "GmParams/LoosenBlocks": "Loosen blocks",
+  "GmParams/FriendlyFire": "Friendly fire"
 }
 

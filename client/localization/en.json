@@ -1,0 +1,13 @@
+{
+  "mode.name": "Team Deathmatch",
+  "mode.description": "Two teams fight to reach the frag limit.",
+
+  "maplist.allmaps": "All Maps",
+
+  "params.MapRotation": "Map rotation",
+  "params.OnlyKnives": "Only knives",
+  "params.OnlyPlayerBlocksDmg": "Damage only to player blocks",
+  "params.LoosenBlocks": "Loosen blocks",
+  "params.FriendlyFire": "Friendly fire"
+}
+

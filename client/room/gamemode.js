@@ -1,27 +1,42 @@
 import { DisplayValueHeader } from 'pixel_combats/basic';
-import { Game, Players, Inventory, LeaderBoard, BuildBlocksSet, Teams, Damage, BreackGraph, Ui, Properties, GameMode, Spawns, Timers, TeamsBalancer, NewGame, NewGameVote } from 'pixel_combats/room';
+import { room,Game, Players, Inventory, LeaderBoard, BuildBlocksSet, Teams, Damage, BreackGraph, Ui, Properties, GameMode, Spawns, Timers, TeamsBalancer, NewGame, NewGameVote, MapEditor } from 'pixel_combats/room';
 import * as teams from './default_teams.js';
 import * as default_timer from './default_timer.js';
+import * as damageScores from './damage_scores.js';
+import * as mapScores from './map_scores.js';
+import { addTeamScores } from './team_scores.js';
+
+room.PopupsEnable = true;
 
 // настройки
 const WaitingPlayersTime = 10;
-const BuildBaseTime = 30;
-const KnivesModeTime = 40;
-const GameModeTime = default_timer.game_mode_length_seconds();
+const TacticalPreparationTime = 30;
+const OvertimeTime = 30;
+const OvertimePauseTime = 3;
 const MockModeTime = 10;
 const EndOfMatchTime = 8;
 const VoteTime = 10;
 
-const KILL_SCORES = 5;
-const WINNER_SCORES = 10;
-const TIMER_SCORES = 5;
-const SCORES_TIMER_INTERVAL = 30;
+// время основной битвы по размерам карт (согласно ТЗ)
+const GAME_MODE_TIMES = {
+	'Length_S': 210,  // 3:30
+	'Length_M': 270,  // 4:30
+	'Length_L': 330,  // 5:30
+	'Length_XL': 390  // 6:30
+};
+
+// очки
+const WINNER_SCORES = 30;  		// очки за победу (новое ТЗ)
+const LOSER_SCORES = 15;			// очки за поражение (новое ТЗ)
+const TIMER_SCORES = 30;			// очки за проведенное время
+const TIMER_SCORES_INTERVAL = 30;	// интервал таймера очков
 
 // имена используемых объектов
 const WaitingStateValue = "Waiting";
-const BuildModeStateValue = "BuildMode";
-const KnivesModeStateValue = "KnivesMode";
+const TacticalPreparationStateValue = "TacticalPreparation";
 const GameStateValue = "Game";
+const OvertimeStateValue = "Overtime";        // овертайм - 30 сек решающий бой с бесконечными патронами
+const TieBreakerStateValue = "TieBreaker";    // финальный фраг - игра до первого убийства при ничьей
 const MockModeStateValue = "MockMode";
 const EndOfMatchStateValue = "EndOfMatch";
 
@@ -60,8 +75,8 @@ LeaderBoard.PlayerLeaderBoardValues = [
 	new DisplayValueHeader("Spawns", "Statistics/Spawns", "Statistics/SpawnsShort"),
 	new DisplayValueHeader(SCORES_PROP_NAME, "Statistics/Scores", "Statistics/ScoresShort")
 ];
-LeaderBoard.TeamLeaderBoardValue = new DisplayValueHeader(SCORES_PROP_NAME, "Statistics\Scores", "Statistics\Scores");
-// задаем сортировку команд для списка лидирующих
+LeaderBoard.TeamLeaderBoardValue = new DisplayValueHeader(SCORES_PROP_NAME, "Statistics\\Scores", "Statistics\\Scores");
+// задаем сортировку команд для списка лидирующих по командному свойству
 LeaderBoard.TeamWeightGetter.Set(function (team) {
 	return team.Properties.Get(SCORES_PROP_NAME).Value;
 });
@@ -110,23 +125,31 @@ Damage.OnDeath.Add(function (player) {
 	}
 	++player.Properties.Deaths.Value;
 });
-// обработчик убийств
-Damage.OnKill.Add(function (player, killed) {
+
+// детальный отчёт по убийству: начисляем очки за убийство и ассисты по ТЗ
+Damage.OnKillReport.Add(function (victim, killer, report) {
 	if (stateProp.Value == MockModeStateValue) return;
-	if (killed.Team != null && killed.Team != player.Team) {
-		++player.Properties.Kills.Value;
-		// добавляем очки кила игроку и команде
-		player.Properties.Scores.Value += KILL_SCORES;
-		if (stateProp.Value !== MockModeStateValue && player.Team != null)
-			player.Team.Properties.Get(SCORES_PROP_NAME).Value += KILL_SCORES;
+	damageScores.applyKillReportScores(victim, killer, report);
+	
+	// если это TieBreaker (ничья в овертайме), завершаем игру
+	if (stateProp.Value === TieBreakerStateValue) {
+		SetEndOfMatch_EndMode();
 	}
 });
 
-// таймер очков за проведенное время
+// начисление очков за редактирование карты
+MapEditor.OnMapEdited.Add(function (player, details) {
+	if (stateProp.Value == MockModeStateValue) return;
+	mapScores.applyMapEditScores(player, details, blueTeam, redTeam);
+});
+
+// таймер очков за проведенное время (только в основной фазе)
 scores_timer.OnTimer.Add(function () {
+	if (stateProp.Value !== GameStateValue) return;
 	for (const player of Players.All) {
-		if (player.Team == null) continue; // если вне команд то не начисляем ничего по таймеру
+		if (player.Team == null) continue; // если вне команд то не начисляем
 		player.Properties.Scores.Value += TIMER_SCORES;
+		addTeamScores(player.Team, TIMER_SCORES);
 	}
 });
 
@@ -134,16 +157,20 @@ scores_timer.OnTimer.Add(function () {
 mainTimer.OnTimer.Add(function () {
 	switch (stateProp.Value) {
 		case WaitingStateValue:
-			SetBuildMode();
+			SetTacticalPreparation();
 			break;
-		case BuildModeStateValue:
-			SetKnivesMode();
-			break;
-		case KnivesModeStateValue:
+		case TacticalPreparationStateValue:
 			SetGameMode();
 			break;
 		case GameStateValue:
+			CheckForOvertime();
+			break;
+		case OvertimeStateValue:
+			// завершаем овертайм
 			SetEndOfMatch();
+			break;
+		case TieBreakerStateValue:
+			// TieBreaker завершается только при убийстве
 			break;
 		case MockModeStateValue:
 			SetEndOfMatch_EndMode();
@@ -164,35 +191,20 @@ function SetWaitingMode() {
 	Spawns.GetContext().enable = false;
 	mainTimer.Restart(WaitingPlayersTime);
 }
-function SetBuildMode() {
-	stateProp.Value = BuildModeStateValue;
-	Ui.GetContext().Hint.Value = "Hint/BuildBase";
+function SetTacticalPreparation() {
+	stateProp.Value = TacticalPreparationStateValue;
+	Ui.GetContext().Hint.Value = "Hint/TacticalPrep";
 	var inventory = Inventory.GetContext();
 	inventory.Main.Value = false;
 	inventory.Secondary.Value = false;
 	inventory.Melee.Value = true;
 	inventory.Explosive.Value = false;
 	inventory.Build.Value = true;
-	// запрет нанесения урона
-	Damage.GetContext().DamageOut.Value = false;
-
-	mainTimer.Restart(BuildBaseTime);
-	Spawns.GetContext().enable = true;
-	SpawnTeams();
-}
-function SetKnivesMode() {
-	stateProp.Value = KnivesModeStateValue;
-	Ui.GetContext().Hint.Value = "Hint/KnivesMode";
-	var inventory = Inventory.GetContext();
-	inventory.Main.Value = false;
-	inventory.Secondary.Value = false;
-	inventory.Melee.Value = true;
-	inventory.Explosive.Value = false;
-	inventory.Build.Value = true;
-	// разрешение нанесения урона
+	// урон включен, быстрый респавн
 	Damage.GetContext().DamageOut.Value = true;
+	Spawns.GetContext().RespawnTime.Value = 2;
 
-	mainTimer.Restart(KnivesModeTime);
+	mainTimer.Restart(TacticalPreparationTime);
 	Spawns.GetContext().enable = true;
 	SpawnTeams();
 }
@@ -200,7 +212,7 @@ function SetGameMode() {
 	// разрешаем нанесение урона
 	Damage.GetContext().DamageOut.Value = true;
 	stateProp.Value = GameStateValue;
-	Ui.GetContext().Hint.Value = "Hint/AttackEnemies";
+	Ui.GetContext().Hint.Value = "Hint/MainBattle";
 
 	var inventory = Inventory.GetContext();
 	if (GameMode.Parameters.GetBool("OnlyKnives")) {
@@ -217,10 +229,50 @@ function SetGameMode() {
 		inventory.Build.Value = true;
 	}
 
-	mainTimer.Restart(GameModeTime);
+	// получаем время основной битвы по размеру карты
+	const gameLength = GameMode.Parameters.GetString('GameLength');
+	const gameTime = GAME_MODE_TIMES[gameLength] || GAME_MODE_TIMES['Length_M'];
+	
+	mainTimer.Restart(gameTime);
 	Spawns.GetContext().Despawn();
 	SpawnTeams();
 }
+// проверка необходимости овертайма
+function CheckForOvertime() {
+	scores_timer.Stop(); // выключаем таймер очков
+	const leaderboard = LeaderBoard.GetTeams();
+	const team1Score = leaderboard[0].Weight;
+	const team2Score = leaderboard[1].Weight;
+	
+	// проверяем условие овертайма: разница команд ≤ 10%
+	const maxScore = Math.max(team1Score, team2Score);
+	const minScore = Math.min(team1Score, team2Score);
+	const difference = maxScore > 0 ? (maxScore - minScore) / maxScore : 0;
+	
+	if (difference <= 0.1) {
+		// запускаем овертайм
+		SetOvertime();
+	} else {
+		// сразу переходим к завершению
+		SetEndOfMatch();
+	}
+}
+
+// функция овертайма
+function SetOvertime() {
+	stateProp.Value = OvertimeStateValue;
+	Ui.GetContext().Hint.Value = "Hint/Overtime";
+	
+	// включаем бесконечные патроны для всех
+	var inventory = Inventory.GetContext();
+	inventory.MainInfinity.Value = true;
+	inventory.SecondaryInfinity.Value = true;
+	inventory.ExplosiveInfinity.Value = true;
+	
+	// запускаем овертайм на 30 секунд
+	mainTimer.Restart(OvertimeTime);
+}
+
 function SetEndOfMatch() {
 	scores_timer.Stop(); // выключаем таймер очков
 	const leaderboard = LeaderBoard.GetTeams();
@@ -231,9 +283,19 @@ function SetEndOfMatch() {
 		for (const win_player of leaderboard[0].Team.Players) {
 			win_player.Properties.Scores.Value += WINNER_SCORES;
 		}
+		// добавляем очки проигравшим
+		for (const lose_player of leaderboard[1].Team.Players) {
+			lose_player.Properties.Scores.Value += LOSER_SCORES;
+		}
 	}
 	else {
-		SetEndOfMatch_EndMode();
+		// ничья - играем до первого очка
+		if (stateProp.Value === OvertimeStateValue) {
+			stateProp.Value = TieBreakerStateValue;
+			Ui.GetContext().Hint.Value = "Hint/TieBreaker";
+		} else {
+			SetEndOfMatch_EndMode();
+		}
 	}
 }
 function SetMockMode(winners, loosers) {
@@ -265,9 +327,6 @@ function SetMockMode(winners, loosers) {
 	inventory.ExplosiveInfinity.Value = true;
 	inventory.BuildInfinity.Value = true;
 
-	// френдли фаер для победивших
-	//Damage.GetContext(winners).FriendlyFire.Value = true;
-
 	// перезапуск таймера мода
 	mainTimer.Restart(MockModeTime);
 }
@@ -288,7 +347,7 @@ function OnVoteResult(v) {
 	if (v.Result === null) return;
 	NewGame.RestartGame(v.Result);
 }
-NewGameVote.OnResult.Add(OnVoteResult); // вынесено из функции, которая выполняется только на сервере, чтобы не зависало, если не отработает, также чтобы не давало баг, если вызван метод 2 раза и появилось 2 подписки
+NewGameVote.OnResult.Add(OnVoteResult);
 
 function start_vote() {
 	NewGameVote.Start({
@@ -302,5 +361,5 @@ function SpawnTeams() {
 		Spawns.GetContext(team).Spawn();
 }
 
-scores_timer.RestartLoop(SCORES_TIMER_INTERVAL);
+scores_timer.RestartLoop(TIMER_SCORES_INTERVAL);
 

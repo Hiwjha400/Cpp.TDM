@@ -357,7 +357,7 @@ function start_vote() {
 		new room_lib.OnlyUniqueVariants(true, false)]; // уникальность по картам, но не по спискам карт
 	
 		// если ротация карт включена, то добавляем 3 карты из всех официальных списков
-	if (MapRotation) variants.push(new room.FromOfficialMapLists(3));
+	if (MapRotation) variants.push(new room_lib.FromOfficialMapLists(3));
 
 	// запускаем голосование по запросам
 	NewGameVote.Start(variants, VoteTime);

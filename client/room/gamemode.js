@@ -1,5 +1,6 @@
 import { DisplayValueHeader } from 'pixel_combats/basic';
-import { room, Game, Players, Inventory, LeaderBoard, BuildBlocksSet, Teams, Damage, BreackGraph, Ui, Properties, GameMode, Spawns, Timers, TeamsBalancer, NewGame, NewGameVote, MapEditor } from 'pixel_combats/room';
+import * as room_lib from 'pixel_combats/room';
+const { room, Game, Players, Inventory, LeaderBoard, BuildBlocksSet, Teams, Damage, BreackGraph, Ui, Properties, GameMode, Spawns, Timers, TeamsBalancer, NewGame, NewGameVote, MapEditor } = PC;
 import * as teams from './default_teams.js';
 import * as default_timer from './default_timer.js';
 import * as damageScores from './damage_scores.js';
@@ -352,8 +353,8 @@ NewGameVote.OnResult.Add(OnVoteResult);
 function start_vote() {
 	// формируем варианты для голосования
 	var variants = [
-		new room.SameVariant(),	// базовый вариант (тоже самое, что было)
-		new room.OnlyUniqueVariants(true, false)]; // уникальность по картам, но не по спискам карт
+		new room_lib.SameVariant(),	// базовый вариант (тоже самое, что было)
+		new room_lib.OnlyUniqueVariants(true, false)]; // уникальность по картам, но не по спискам карт
 	
 		// если ротация карт включена, то добавляем 3 карты из всех официальных списков
 	if (MapRotation) variants.push(new room.FromOfficialMapLists(3));

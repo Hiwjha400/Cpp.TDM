@@ -1,6 +1,6 @@
 {
-  "Name": "mode.name",
-  "Description": "mode.description",
+  "Name": "pryaniki(TDM) - v3q8t",
+  "Description": "тоже самое но в тдм",
   "DefaultLang": "en",
   "StartClientVersion": 703,
   "MapFilter": {
@@ -76,7 +76,7 @@
         "Order": 4
       },
       {
-        "Name": "FriendlyFire",
+        "Name": "френдлифаер",
         "DisplayName": "params.FriendlyFire",
         "Order": 5
       }

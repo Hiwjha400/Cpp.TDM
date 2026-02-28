@@ -70,7 +70,7 @@ function calcMapEditScore(details, allyRootBlockId, enemyRootBlockId) {
 			total += scoresToadd;
 			// выводим уведомление
 			ScoreInfo.Show(details.Player, {
-				Type: 5, // EnemyBlockDestroy
+				Type: 500, // EnemyBlockDestroy
 				WeaponId: 0,
 				Scores: scoresToadd,
 				IsHeadshot: false
